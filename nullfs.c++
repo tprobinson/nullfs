@@ -7,8 +7,10 @@
 */
 
 #define _FILE_OFFSET_BITS 64
+#define __USE_LARGEFILE64 1
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -50,6 +52,7 @@ static int nullfs_getattr(const char *path, struct stat *stbuf) {
     if (nullfs_isdir(path)) {
         stbuf->st_mode = S_IFDIR | 0777;
         stbuf->st_nlink = 3;
+        stbuf->st_size = 0;
     } else if (nullfs_isfile(path)) {
         stbuf->st_mode = S_IFREG | 0666;
         stbuf->st_nlink = 1;
@@ -57,6 +60,27 @@ static int nullfs_getattr(const char *path, struct stat *stbuf) {
     } else {
         res = -ENOENT;
     };
+
+    return res;
+};
+
+static int nullfs_statfs(const char *path, struct statvfs *stbuf) {
+    int res = 0;
+
+    memset(stbuf, 0, sizeof(struct statvfs));
+//	These give a size of 32,768 yottabytes
+	stbuf->f_bsize = LLONG_MAX;
+	stbuf->f_blocks = LLONG_MAX;
+	stbuf->f_bfree = LLONG_MAX;
+	stbuf->f_bavail = LLONG_MAX;
+//	These will give a size of about 480 TB
+//        stbuf->f_bsize = 4096 * 1024;
+//        stbuf->f_blocks = (120 * 1024 * 1024);
+//        stbuf->f_bfree = (120 * 1024 * 1024);
+//        stbuf->f_bavail = (120 * 1024 * 1024);
+        stbuf->f_files = 1;
+        stbuf->f_ffree = 1;
+	stbuf->f_fsid = 99999;
 
     return res;
 };
@@ -204,6 +228,7 @@ int main(int argc, char *argv[]) {
     nullfs_oper.rename = nullfs_rename;
     nullfs_oper.chmod = nullfs_chmod;
     nullfs_oper.utimens = nullfs_utimens;
+    nullfs_oper.statfs = nullfs_statfs;
     return fuse_main(argc, argv, &nullfs_oper, NULL);
 };
 
